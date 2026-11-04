@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Europe places map</title>
+<link href="https://api.mapbox.com/mapbox-gl-js/v3.9.4/mapbox-gl.css" rel="stylesheet">
+<script src="https://api.mapbox.com/mapbox-gl-js/v3.9.4/mapbox-gl.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;600;800&display=swap" rel="stylesheet">
+<style>
+  /* ====== Paste your Mapbox public token in the script below (MAPBOX_TOKEN) ====== */
+  :root{
+    --panel:#ffffffee; --ink:#1d1a24; --muted:#6b6577; --line:#e4e0ea;
+    --chip:#ced6fd; --chip-ink:#1d1a24; --chip-on:#222fbf; --chip-on-ink:#ffffff;
+    --r1:#f9c8de; --r2:#f395c0; --r3:#f0569b; --r4:#ca1667; --r5:#8b0950; --gold:#e8b007;
+    --font:"Geist", system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{ color-scheme:dark; --panel:#1f1c26ee; --ink:#f1eef6; --muted:#a59fb2; --line:#38333f;
+       }
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;font-family:var(--font);color:var(--ink);background:#ddd}
+  #map{position:absolute;inset:0}
+  #panel{position:absolute;top:12px;left:12px;bottom:12px;width:300px;z-index:2;
+    background:var(--panel);backdrop-filter:blur(8px);border-radius:14px;
+    box-shadow:0 6px 24px rgba(20,10,40,.18);display:flex;flex-direction:column;overflow:hidden}
+  #panel header{padding:16px 18px 10px;border-bottom:1px solid var(--line)}
+  h1{font-size:22px;font-weight:800;margin:0;letter-spacing:-.01em;line-height:1.1}
+  #count{margin:4px 0 0;color:var(--muted);font-size:14px}
+  #filters{overflow-y:auto;padding:4px 18px 18px;flex:1}
+  fieldset{border:0;padding:0;margin:14px 0 0}
+  legend{font-weight:600;font-size:14px;margin-bottom:6px;padding:0}
+  .chips{display:flex;flex-wrap:wrap;gap:6px}
+  .chip{border:1px solid transparent;background:var(--chip);color:var(--chip-ink);font:inherit;font-size:14px;
+    padding:5px 11px;border-radius:999px;cursor:pointer}
+  .chip[aria-pressed="true"]{background:var(--chip-on);color:var(--chip-on-ink)}
+  .chip.r1[aria-pressed="true"]{background:var(--r1);color:#1d1a24}
+  .chip.r2[aria-pressed="true"]{background:var(--r2);color:#1d1a24}
+  .chip.r3[aria-pressed="true"]{background:var(--r3);color:#fff}
+  .chip.r4[aria-pressed="true"]{background:var(--r4);color:#fff}
+  .chip.r5[aria-pressed="true"]{background:var(--r5);color:#fff}
+  .chip:focus-visible,.toggle input:focus-visible+span,button:focus-visible,input:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+  .dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:5px;vertical-align:1px}
+  .toggle{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 0;font-size:15px;cursor:pointer}
+  .toggle input{position:absolute;opacity:0}
+  .toggle span.sw{width:38px;height:22px;border-radius:11px;background:var(--chip);position:relative;flex:none;transition:background .15s}
+  .toggle span.sw::after{content:"";position:absolute;top:3px;left:3px;width:16px;height:16px;border-radius:50%;background:#fff;transition:transform .15s}
+  .toggle input:checked+span.sw{background:var(--chip-on)}
+  .toggle input:checked+span.sw::after{transform:translateX(16px)}
+  #typeSearch{width:100%;font:inherit;font-size:14px;padding:7px 10px;border-radius:8px;border:1px solid var(--line);background:transparent;color:var(--ink);margin-bottom:6px}
+  #typeList{max-height:190px;overflow-y:auto;border:1px solid var(--line);border-radius:8px;padding:4px 8px}
+  #typeList input{appearance:none;-webkit-appearance:none;width:16px;height:16px;margin:0;border-radius:4px;background:var(--chip);flex:none;cursor:pointer;display:grid;place-items:center}
+  #typeList input:checked{background:var(--chip-on)}
+  #typeList input:checked::after{content:"✓";font-size:12px;line-height:1;color:#fff}
+  #typeList label{display:flex;gap:8px;align-items:center;font-size:14px;padding:3px 0;cursor:pointer}
+  #typeList .n{margin-left:auto;color:var(--muted);font-size:12px}
+  .row{display:flex;gap:10px;margin-top:6px}
+  .link{background:none;border:0;padding:0;font:inherit;font-size:13px;color:var(--muted);text-decoration:underline;cursor:pointer}
+  #reset{margin-top:18px;width:100%;font:inherit;font-weight:600;padding:9px;border-radius:10px;border:0;background:var(--chip);color:var(--chip-ink);cursor:pointer}
+  #panelToggle{display:none}
+  /* popup */
+  .mapboxgl-popup-content{font-family:var(--font);border-radius:12px;padding:14px 16px 12px;max-width:290px;color:#1d1a24}
+  .pop h2{font-size:18px;margin:0 22px 6px 0;line-height:1.2}
+  .pop .rec{display:inline-block;background:var(--gold);color:#1d1a24;font-size:12px;font-weight:600;padding:2px 8px;border-radius:999px;margin-bottom:8px}
+  .pop dl{margin:0;display:grid;grid-template-columns:auto 1fr;gap:4px 10px;font-size:13px}
+  .pop dt{color:#6b6577}
+  .pop dd{margin:0}
+  .pop .comment{grid-column:1/-1;margin-top:4px;font-style:italic;line-height:1.45}
+  #tokenGate{position:absolute;inset:0;z-index:5;display:none;place-items:center;background:#1d1a24cc}
+  #tokenGate form{background:var(--panel);padding:20px;border-radius:14px;width:min(420px,90vw)}
+  #tokenGate input{width:100%;font:inherit;padding:8px;margin:8px 0;border-radius:8px;border:1px solid var(--line)}
+  @media (max-width:640px){
+    #panel{top:auto;left:0;right:0;bottom:0;width:auto;max-height:60vh;border-radius:14px 14px 0 0;padding-bottom:env(safe-area-inset-bottom,0px)}
+    #panel.collapsed #filters{display:none}
+    #panelToggle{display:block;position:absolute;top:14px;right:16px}
+  }
+</style>
+</head>
+<body>
+<div id="map"></div>
+
+<aside id="panel">
+  <header>
+    <h1>Euro Food Map</h1>
+    <p id="count"></p>
+    <button id="panelToggle" class="link" aria-expanded="true">Hide filters</button>
+  </header>
+  <div id="filters">
+    <fieldset>
+      <label class="toggle"><span>Only places with comments</span><input type="checkbox" id="onlyComments"><span class="sw"></span></label>
+      <label class="toggle"><span>Only Carmen’s Lisbon recs</span><input type="checkbox" id="onlyCQ"><span class="sw"></span></label>
+    </fieldset>
+    <fieldset><legend>Rating</legend><div class="chips" id="ratingChips"></div></fieldset>
+    <fieldset><legend>Times visited</legend><div class="chips" id="visitChips"></div></fieldset>
+    <fieldset><legend>Year added</legend><div class="chips" id="yearChips"></div></fieldset>
+    <fieldset>
+      <legend>Type</legend>
+      <input id="typeSearch" type="search" placeholder="Search types" aria-label="Search types">
+      <div id="typeList"></div>
+      <div class="row"><button class="link" id="typesNone">Clear types</button></div>
+    </fieldset>
+    <button id="reset">Reset filters</button>
+  </div>
+</aside>
+
+
+<script>
+// ================= CONFIG =================
+const MAPBOX_TOKEN = 'pk.eyJ1IjoiY2FycXVpMjMiLCJhIjoiY21mbDlkOXJzMDJtbzJxcHdybWpyZzVseCJ9.8uLZIhZFSzpjV8QdYPbe7g';
+const MAP_STYLE = 'mapbox://styles/carqui23/cmvlhv3vh003b01s64m9ndgwb';
+// Layer id(s) of your places layer in Mapbox Studio. Leave empty to auto-detect
+// (any layer whose features have NAME and RATING properties).
+let PLACE_LAYERS = [];
+// Columns left out of the popup
+const HIDDEN_IN_POPUP = ['RATING', 'LATITUDE', 'LONGITUDE'];
+const POPUP_ORDER = ['ADDRESS','TYPE','TIMES VISITED','YEAR ADDED'];
+const VISIT_BUCKETS = [
+  {label:'1', min:1, max:1}, {label:'2', min:2, max:2},
+  {label:'3–5', min:3, max:5}, {label:'6+', min:6, max:1e9}
+];
+const TYPE_ALIASES = {'cafe':'Café','café':'Café','argentinian':'Argentine'};
+// ==========================================
+
+const num = v => { const n = parseFloat(v); return isNaN(n) ? null : n; };
+function normType(t){
+  const k = String(t ?? '').trim().toLowerCase();
+  if (TYPE_ALIASES[k]) return TYPE_ALIASES[k];
+  return k ? k.charAt(0).toUpperCase()+k.slice(1) : 'Unknown';
+}
+const isTrue = v => String(v ?? '').trim().toLowerCase() === 'true';
+const hasText = v => v != null && String(v).trim() !== '';
+
+// ---- data collected from the map's tiles ----
+const features = new Map();          // key -> properties
+const typeRaw = new Map();           // normalized type -> Set of raw lowercase values
+const years = new Set(), ratings = new Set();
+let typesSeen = [];
+
+const state = { ratings:null, years:null, visits:null, types:null, onlyComments:false, onlyCQ:false };
+
+function ratingKey(p){ const r = num(p.RATING); return r == null || r === 0 ? 'none' : r; }
+function visitBucket(p){ const v = num(p['TIMES VISITED']); return v==null ? 'Unknown' : (VISIT_BUCKETS.find(b=>v>=b.min&&v<=b.max)||{}).label || 'Unknown'; }
+function passes(p){
+  // A group with nothing selected doesn't filter anything
+  if (state.ratings.size && !state.ratings.has(ratingKey(p))) return false;
+  if (state.years.size && !state.years.has(num(p['YEAR ADDED']))) return false;
+  if (state.types.size && !state.types.has(normType(p.TYPE))) return false;
+  if (state.visits.size && !state.visits.has(visitBucket(p))) return false;
+  if (state.onlyComments && !hasText(p.COMMENT)) return false;
+  if (state.onlyCQ && !isTrue(p.CQ)) return false;
+  return true;
+}
+
+// ---- Mapbox filter expression mirroring passes() ----
+function mapFilter(){
+  const rating = ['to-number', ['coalesce', ['get','RATING'], 0], 0];
+  const visits = ['to-number', ['coalesce', ['get','TIMES VISITED'], -1], -1];
+  const year   = ['to-number', ['coalesce', ['get','YEAR ADDED'], -1], -1];
+  const type   = ['downcase', ['to-string', ['coalesce', ['get','TYPE'], '']]];
+  const all = ['all'];
+
+  const rs = [...state.ratings].map(r => r==='none' ? 0 : r);
+  if (rs.length) all.push(['in', rating, ['literal', rs]]);
+  if (state.years.size) all.push(['in', year, ['literal', [...state.years]]]);
+
+  const vAny = ['any'];
+  VISIT_BUCKETS.forEach(b => { if (state.visits.has(b.label)) vAny.push(['all', ['>=', visits, b.min], ['<=', visits, b.max]]); });
+  if (state.visits.has('Unknown')) vAny.push(['<', visits, 0.5]);
+  if (vAny.length > 1) all.push(vAny);
+
+  const raws = [];
+  state.types.forEach(t => (typeRaw.get(t) || []).forEach(r => raws.push(r)));
+  if (state.types.size) all.push(['in', type, ['literal', raws]]);
+
+  if (state.onlyComments) all.push(['>', ['length', ['to-string', ['coalesce', ['get','COMMENT'], '']]], 0]);
+  if (state.onlyCQ) all.push(['==', ['downcase', ['to-string', ['coalesce', ['get','CQ'], '']]], 'true']);
+  return all;
+}
+
+// ---- UI ----
+function chipGroup(el, items, set, labelFn, classFn){
+  el.innerHTML='';
+  items.forEach(v=>{
+    const b=document.createElement('button');
+    b.className='chip'; b.type='button';
+    b.setAttribute('aria-pressed', set.has(v));
+    b.textContent=labelFn?labelFn(v):v;
+    if (classFn && classFn(v)) b.classList.add(classFn(v));
+    b.onclick=()=>{ set.has(v)?set.delete(v):set.add(v); b.setAttribute('aria-pressed', set.has(v)); update(); };
+    el.appendChild(b);
+  });
+}
+function sortedRatings(){ const r=[...ratings].filter(x=>x!=='none').sort((a,b)=>a-b); if (ratings.has('none')) r.push('none'); return r; }
+function visitLabels(){ const s=new Set([...features.values()].map(visitBucket)); return [...VISIT_BUCKETS.map(b=>b.label),'Unknown'].filter(l=>s.has(l)); }
+function buildUI(){
+  chipGroup(document.getElementById('ratingChips'), sortedRatings(), state.ratings, r=>r==='none'?'Unrated':r+'★', r=>r==='none'?'':'r'+r);
+  chipGroup(document.getElementById('visitChips'), visitLabels(), state.visits);
+  chipGroup(document.getElementById('yearChips'), [...years].sort(), state.years);
+  document.getElementById('onlyComments').checked=state.onlyComments;
+  document.getElementById('onlyCQ').checked=state.onlyCQ;
+  buildTypes();
+}
+function buildTypes(){
+  const q=document.getElementById('typeSearch').value.trim().toLowerCase();
+  const list=document.getElementById('typeList'); list.innerHTML='';
+  const counts={}; features.forEach(p=>{const t=normType(p.TYPE); counts[t]=(counts[t]||0)+1;});
+  typesSeen.filter(t=>t.toLowerCase().includes(q)).forEach(t=>{
+    const l=document.createElement('label');
+    l.innerHTML=`<input type="checkbox" ${state.types.has(t)?'checked':''}> <span></span><span class="n">${counts[t]||0}</span>`;
+    l.querySelector('span').textContent=t;
+    l.querySelector('input').onchange=e=>{ e.target.checked?state.types.add(t):state.types.delete(t); update(); };
+    list.appendChild(l);
+  });
+}
+function resetState(){
+  state.ratings=new Set(); state.years=new Set();
+  state.visits=new Set(); state.types=new Set();
+  state.onlyComments=false; state.onlyCQ=false;
+}
+document.getElementById('typeSearch').oninput=buildTypes;
+document.getElementById('typesNone').onclick=()=>{state.types.clear(); buildTypes(); update();};
+document.getElementById('onlyComments').onchange=e=>{state.onlyComments=e.target.checked; update();};
+document.getElementById('onlyCQ').onchange=e=>{state.onlyCQ=e.target.checked; update();};
+document.getElementById('reset').onclick=()=>{resetState(); document.getElementById('typeSearch').value=''; buildUI(); update();};
+const pt=document.getElementById('panelToggle');
+pt.onclick=()=>{const c=document.getElementById('panel').classList.toggle('collapsed'); pt.textContent=c?'Show filters':'Hide filters'; pt.setAttribute('aria-expanded',!c);};
+
+// ---- map ----
+mapboxgl.accessToken = MAPBOX_TOKEN;
+const map = new mapboxgl.Map({ container:'map', style:MAP_STYLE, center:[-4.650, 36.957], zoom:2.32 });
+map.addControl(new mapboxgl.NavigationControl(), 'top-right');
+const originalFilters = {};
+
+function update(){
+  if (!state.ratings) return;
+  let shown=0; features.forEach(p=>{ if (passes(p)) shown++; });
+  document.getElementById('count').textContent = `Showing ${shown} of ${features.size} places`;
+  const f = mapFilter();
+  PLACE_LAYERS.forEach(id=>{
+    const orig = originalFilters[id];
+    map.setFilter(id, orig ? ['all', orig, f] : f);
+  });
+}
+
+function detectLayers(){
+  if (PLACE_LAYERS.length) return;
+  const found = new Set();
+  map.queryRenderedFeatures().forEach(f=>{
+    const p=f.properties||{};
+    if ('NAME' in p && ('RATING' in p || 'TYPE' in p)) found.add(f.layer.id);
+  });
+  PLACE_LAYERS=[...found];
+}
+
+function collect(){
+  let changed=false;
+  PLACE_LAYERS.forEach(id=>{
+    const layer=map.getLayer(id); if (!layer) return;
+    const src=layer.source, sl=layer.sourceLayer || layer['source-layer'];
+    const feats = map.querySourceFeatures(src, sl ? {sourceLayer: sl} : {});
+    feats.forEach(f=>{
+      const p=f.properties||{};
+      const key=(p.NAME||'')+'|'+(p.ADDRESS||'')+'|'+(p.LATITUDE ?? '')+'|'+(p.LONGITUDE ?? '');
+      if (features.has(key)) return;
+      features.set(key,p); changed=true;
+      const t=normType(p.TYPE), raw=String(p.TYPE ?? '').toLowerCase();
+      if (!typeRaw.has(t)) typeRaw.set(t,new Set());
+      typeRaw.get(t).add(raw);
+      const y=num(p['YEAR ADDED']); if (y!=null) years.add(y);
+      ratings.add(ratingKey(p));
+    });
+  });
+  return changed;
+}
+
+let ready=false;
+function hookLayers(){
+  PLACE_LAYERS.forEach(id=>{
+    originalFilters[id]=map.getFilter(id) || null;
+    map.on('click', id, e=>{
+      const p=e.features[0].properties;
+      new mapboxgl.Popup({offset:10, maxWidth:'300px'}).setLngLat(e.lngLat).setHTML(popupHTML(p)).addTo(map);
+    });
+    map.on('mouseenter', id, ()=>map.getCanvas().style.cursor='pointer');
+    map.on('mouseleave', id, ()=>map.getCanvas().style.cursor='');
+  });
+}
+
+map.on('idle', ()=>{
+  if (!ready){
+    detectLayers();
+    if (!PLACE_LAYERS.length){
+      document.getElementById('count').textContent='Couldn’t find the places layer. Add its layer id to PLACE_LAYERS in the file.';
+      return;
+    }
+    ready=true; hookLayers();
+  }
+  // Pick up any places from newly loaded tiles
+  if (collect() || !state.ratings){
+    typesSeen=[...typeRaw.keys()].sort((a,b)=>a.localeCompare(b));
+    if (!state.ratings) resetState();
+    buildUI(); update();
+  }
+});
+
+function esc(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+function popupHTML(p){
+  let h=`<div class="pop"><h2>${esc(p.NAME ?? '')}</h2>`;
+  if (isTrue(p.CQ)) h+=`<span class="rec">Carmen’s recommendation</span>`;
+  h+='<dl>';
+  const skip=new Set([...HIDDEN_IN_POPUP,'NAME','CQ','COMMENT']);
+  const keys=[...POPUP_ORDER.filter(k=>k in p), ...Object.keys(p).filter(k=>!POPUP_ORDER.includes(k))];
+  keys.forEach(k=>{
+    if (skip.has(k) || !hasText(p[k])) return;
+    const label=k.charAt(0)+k.slice(1).toLowerCase();
+    h+=`<dt>${esc(label)}</dt><dd>${esc(p[k])}</dd>`;
+  });
+  if (hasText(p.COMMENT)) h+=`<dd class="comment">“${esc(p.COMMENT)}”</dd>`;
+  return h+'</dl></div>';
+}
+</script>
+</body>
+</html>
